@@ -1,0 +1,112 @@
+---
+title: <center><h1>Exercise Method Analysis</h1></center>
+author: <center><h1>Sashi</h1></center>
+
+---
+
+###Summary
+Various devices like FitBit measures various parameters of body movements during exercise. The question is can these measurement predict if the exercise is being done correctly? In this analysis, a control experimental data was used to model the body movements parameter to check if the exercise is done correctly or what type of mistake is being done. Random forest method was used to model. The model gave less than 1% out of sample error. 
+
+###Introduction
+There has been an increased use of devices that measures the various parameters during all activities including exercise. This project is to analysis these data to see if the exercise is done correctly. First a model is built with the data from six persons doing exercise correctly and different incorrect methods. The class of exercise was modeled using the collected data from the six persons. Random forest method was used to build the model. This method showed a very low out of sample error. This model was used to predict the sample test set.
+
+How cool it is if your Fitbit tells us if you are doing the exercise correct.
+
+###Data load and cleanup
+
+The data was downloaded from the website. Quick review of the data ( not shown here) several columns over 90% blank or NA data. These column were removed from the analysis. The first 5 columns were more a row indicator data and is not relevant to the analysis. These were removed as well. The final data information like:
+
+```{r, echo = TRUE, cache = TRUE, message=FALSE}
+library(caret)
+library(ggplot2)
+setwd("~/Data Science course/ML project")
+set.seed(50)
+library(randomForest)
+
+pmldata<-read.csv("pml-training.csv",header = T)
+
+pmldata[pmldata==""]<-NA
+pmldata<-pmldata[colSums(is.na(pmldata))/dim(pmldata)[1]<.1]
+#remove features with unqiue values
+pmldata<-pmldata[,-c(1:5)]
+
+str(pmldata)
+
+```
+
+This data is now divided into 60% training and 40% test set.
+
+```{r, echo = TRUE, cache = TRUE, message=FALSE}
+inTrain = createDataPartition(pmldata$classe, p = .6)[[1]]
+training = pmldata[ inTrain,]
+testing = pmldata[-inTrain,]
+
+print(c('Training set dim ',dim(training)))
+```
+
+###Model
+
+Choose to use random forest as a model for this set of data. Random Forest is a good accurate model. We would have used single tree classification model as well and figure out the out of sample error. For the sake of time, used only random forest method only.
+Note: the Caret package is very slow on my computer used the randomForest package.
+
+The accuracy of the training set:
+
+```{r, echo = TRUE, cache = TRUE, message=FALSE}
+
+fsmodel<-randomForest(factor(training[,55])~.,data=training[,-55],importance=TRUE,ntree=2000)
+
+trainingpredict<-predict(fsmodel,training)
+confusionMatrix(trainingpredict,training$classe)
+```
+
+This shows a high accuracy in the model. The importance of the predictors are:
+
+```{r, echo = TRUE, cache = TRUE, message=FALSE}
+varImpPlot(fsmodel,cex = 0.9, pch = 15,color = "brown", lcolor = "blue",bg="black",type=1,main="ALL Features")
+
+```
+
+Now let us look how well it predicts the test set:
+
+
+```{r, echo = TRUE, cache = TRUE, message=FALSE}
+testpredict<-predict(fsmodel,testing)
+confusionMatrix(testpredict,testing$classe)
+```
+
+Out of sample error is (in %): 
+
+```{r, echo = TRUE, cache = TRUE, message=FALSE}
+OOSErf<-1-confusionMatrix(predict(fsmodel,testing),testing$classe)$overall[1]
+OOSErf*100
+```
+
+Since the out of sample error is very small, we can conclude that this is a good model.
+
+### Cross Validation Test
+
+There is a possibility this model could over fit the data. 10 fold cross validation method was used with random forest method. The result using test set to predict is:
+
+```{r, echo = TRUE, cache = TRUE, message=FALSE}
+rf_model<-train(classe~.,data=training,method="rf",
+                trControl=trainControl(method="cv",number=5),
+                prox=TRUE,allowParallel=TRUE)
+
+confusionMatrix(predict(rf_model,testing),testing$classe)
+
+```
+
+Out of Sample error:
+
+```{r, echo = TRUE, cache = TRUE, message=FALSE}
+OOSEcv<-1-confusionMatrix(predict(rf_model,testing),testing$classe)$overall[1]
+OOSEcv*100
+```
+
+Since the error is small this is also a good model. Since the difference in the error between the two method is about same, any one of the model can be used.
+
+The first Random Forest model was used to predict the 20 test cases.
+
+###Conclusion
+
+The data set is a well behaved data set. Possible any number of models would have shown to be a good model. Random Forest model showed a less than 1% out of sample error. This model can be used to predict how well the exercise is been done by the subject.
